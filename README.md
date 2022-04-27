@@ -33,3 +33,4 @@ For the first phase, the expected output is as follows:
 3) All the parameters(which are video name, stacked view, resize param, view, save)
 
 - in 1 and 2, the other paramaters are set to their default values.
+![MicrosoftTeams-image](https://user-images.githubusercontent.com/84995958/165550928-236881f3-3fbd-4989-b9cc-e4ee62ac2dca.png)
