@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# ## Names and IDs:
+# 
+# - Yousef Adel Ismail Mohammed Shalaby (1802267)
+# - John Magdy William Eskander Awadallah (1808270)
+# - Farah Ihab Samir Abdo Mikhael  (1802653)
+
 # # Phase 1 - Lane Line Detection
 
 # ### Approach Steps:
@@ -14,10 +20,11 @@
 # - Calculate radius of curvature and position from the center of the lane
 # - Got all final outputs and implemented stacked image to use in debugging mode
 # - Experiment with video
+# 
 
 # ### Import Libraries:
 
-# In[1]:
+# In[35]:
 
 
 import numpy as np
@@ -26,7 +33,7 @@ import glob
 import os
 import sys
 import matplotlib.pyplot as plt
-#get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -36,7 +43,7 @@ warnings.filterwarnings('ignore')
 
 # ### Implemented Functions:
 
-# In[2]:
+# In[36]:
 
 
 def grayscale(img):
@@ -44,7 +51,7 @@ def grayscale(img):
     return gray
 
 
-# In[3]:
+# In[37]:
 
 
 def gaussian(img, kernel_size):
@@ -53,7 +60,7 @@ def gaussian(img, kernel_size):
     return blurry
 
 
-# In[4]:
+# In[38]:
 
 
 def abs_sobel_thresh(img, orients='x', sobel_kernel=3, thresh=(0,255)):
@@ -78,7 +85,7 @@ def abs_sobel_thresh(img, orients='x', sobel_kernel=3, thresh=(0,255)):
     return binary_output
 
 
-# In[5]:
+# In[39]:
 
 
 def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
@@ -106,7 +113,7 @@ def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
     return binary_output
 
 
-# In[6]:
+# In[40]:
 
 
 def dir_thresh(img, sobel_kernel=3, thresh=(0,np.pi/2)):
@@ -129,7 +136,7 @@ def dir_thresh(img, sobel_kernel=3, thresh=(0,np.pi/2)):
     return binary_output
 
 
-# In[7]:
+# In[41]:
 
 
 def hls_select(img, thresh=(0,255)):
@@ -144,7 +151,7 @@ def hls_select(img, thresh=(0,255)):
     return binary_output
 
 
-# In[9]:
+# In[42]:
 
 
 def warp_image(img):
@@ -195,7 +202,7 @@ def warp_image(img):
     return warped_image, unwarped_image, M, Minv
 
 
-# In[11]:
+# In[43]:
 
 
 def find_lane_pixels(warped_image, plot= False):
@@ -338,7 +345,7 @@ def fit_polynomial(binary_warped):
     return left_fit, right_fit, out_img
 
 
-# In[12]:
+# In[44]:
 
 
 def fit_continuous(left_fit, right_fit, warped_image, plot = True):
@@ -412,7 +419,7 @@ def fit_continuous(left_fit, right_fit, warped_image, plot = True):
     return left_fit_new, right_fit_new, result
 
 
-# In[13]:
+# In[45]:
 
 
 def lane_detection(img_file, apply_blur=False):
@@ -457,7 +464,7 @@ def lane_detection(img_file, apply_blur=False):
     return image, sobelx_bin, S_channel_bin, combined_bin1, combined_bin2, warped_image
 
 
-# In[14]:
+# In[46]:
 
 
 #Calculate Curvature
@@ -514,7 +521,7 @@ def curvature(left_fit, right_fit, binary_warped, print_data = True):
     return left_curverad, right_curverad, center
 
 
-# In[15]:
+# In[47]:
 
 
 def project_lane_line(warped_image, left_fit, right_fit, orig_img):
@@ -546,7 +553,7 @@ def project_lane_line(warped_image, left_fit, right_fit, orig_img):
     return result, filled_warp
 
 
-# In[16]:
+# In[102]:
 
 
 def write_on_Image(orig, left_curve,right_curve,center_dist):
@@ -571,7 +578,70 @@ def write_on_Image(orig, left_curve,right_curve,center_dist):
     return test_img
 
 
-# In[17]:
+# In[130]:
+
+
+#load paths
+weights_path= os.path.join("yolo", "yolov3.weights")
+config_path= os.path.join("yolo", "yolov3.cfg")
+ 
+#load neaural net
+net = cv2.dnn.readNetFromDarknet(config_path,weights_path)
+
+#get layer names
+names = net.getLayerNames()
+layers_names= [names[i-1] for i in net.getUnconnectedOutLayers()]
+
+def Car_Detectrion(img):
+    img_w_car_det = img.copy()
+    
+    (H,W)=img_w_car_det.shape[:2]
+
+    #run the inference on the test image
+    blob=cv2.dnn.blobFromImage(img_w_car_det,1/255.0,(416,416),crop=False,swapRB=False)
+    net.setInput(blob)
+
+    layers_output=net.forward(layers_names)
+
+    boxes=[]
+    confidences=[]
+    classIDs=[]
+
+    for output in layers_output:
+        for detection in output:
+            scores=detection[5:]
+            classID =np.argmax(scores)
+            confidence=scores[classID]
+            
+            if confidence>0.85:
+                box=detection[:4]*np.array([W,H,W,H])
+                bx, by, bw, bh = box.astype("int")
+                
+                x = int(bx - (bw / 2))
+                y = int(by - (bh / 2))
+                
+                boxes.append([x, y, int(bw), int(bh)])
+                confidences.append(float(confidence))
+                classIDs.append(classID)
+
+    idxs=cv2.dnn.NMSBoxes(boxes, confidences, 0.8, 0.8)
+
+    labels_path = os.path.join("yolo", "coco_names.txt")
+    labels = open(labels_path).read().strip().split("\n")
+
+    #plot bounding boxes in image
+    if len(idxs) > 0:
+        for i in idxs.flatten():
+            (x,y) = [boxes[i][0], boxes[i][1]]
+            (w,h) = [boxes[i][2], boxes[i][3]]
+            
+            cv2.rectangle(img_w_car_det, (x, y), (x + w, y + h), (222,180,222), 2)
+            cv2.putText(img_w_car_det,"{}: {:.4f}".format(labels[classIDs[i]], confidences[i]),(x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (222,180,222),2)
+            
+    return img_w_car_det
+
+
+# In[66]:
 
 
 def Print_stacked_image(imgArray, resize_param):
@@ -607,7 +677,7 @@ def Print_stacked_image(imgArray, resize_param):
     return imgStack
 
 
-# In[18]:
+# In[67]:
 
 
 def pipeline(img, resize_param):
@@ -626,11 +696,11 @@ def pipeline(img, resize_param):
     #file, debug = take_filename
     image = img
     
-    counter = 0
-    #global last_left 
-    #global last_right
-    #global left_fit
-    #global right_fit
+    global counter
+    global last_left 
+    global last_right
+    global left_fit
+    global right_fit
     
     #inputVideo = './project_video.mp4' 
     #outputVideo ='./output_videos/project_video.mp4'
@@ -653,19 +723,18 @@ def pipeline(img, resize_param):
     # Print radius of curvature and position on the original photo
     final = write_on_Image(filled_img, left_curverad, right_curverad, center)
 
-
-    #plt.imshow(out_img)
-    img_stack = Print_stacked_image([final, image, sobelx_bin, warped_image, out_img, filled_warp], resize_param)
+    img_w_car_det = Car_Detectrion(final)
     
-    #return final
-    #return sobelx_bin, warped_image, out_img, final, filled_warp, img_stack
-    return final, img_stack
+    #plt.imshow(out_img)
+    img_stack = Print_stacked_image([img_w_car_det, image, sobelx_bin, warped_image, out_img, filled_warp], resize_param)
+    
+    return img_w_car_det, img_stack
 
 
-# In[19]:
+# In[81]:
 
 
-def Prcoess_video(filename, stacked = 0, resize_param = 0.5, save = 0, show = 1):
+def Prcoess_video(filename, stacked = 0, resize_param = 0.7, save = 0, show = 1):
     """""
     A function that processes the video and you can choose whether to show in terminal, save output video
     without showing video in terminal, show video in terminal and save output video or do nothing
@@ -678,11 +747,10 @@ def Prcoess_video(filename, stacked = 0, resize_param = 0.5, save = 0, show = 1)
     # Naming output video without using new input parameters
     output_name = filename.replace(".mp4","")
     output_name = output_name + '_out.mp4'
+    
     if(stacked == 1):
         output_name = output_name.replace(".mp4","")
         output_name = output_name + '_stacked.mp4'
-
-    
 
     if (video.isOpened() == False): 
         print("Error reading video file")
@@ -694,14 +762,13 @@ def Prcoess_video(filename, stacked = 0, resize_param = 0.5, save = 0, show = 1)
        frame_width = int(frame_width * resize_param * 1.5)
        frame_height = int(frame_height * resize_param * 1.5)
     
-    if(save):   
-        result = cv2.VideoWriter(output_name, cv2.VideoWriter_fourcc(*'MJPG'), 25, (frame_width, frame_height))
+    result = cv2.VideoWriter(output_name, cv2.VideoWriter_fourcc(*'MJPG'), 25, (frame_width, frame_height))
         
     while(video.isOpened()):
         ret, frame = video.read()
         
         if(ret): 
-            final, img_stack = pipeline(frame, resize_param)
+            img_w_car_det, img_stack = pipeline(frame, resize_param)
 
             if(stacked):
                 if(save & show):
@@ -713,13 +780,15 @@ def Prcoess_video(filename, stacked = 0, resize_param = 0.5, save = 0, show = 1)
                     cv2.imshow('img_stack', img_stack)
            
             else:
+                img_w_car_det = cv2.resize(img_w_car_det, (0, 0), None, 1.5*resize_param, 1.5*resize_param)
+                
                 if(save & show):
-                    result.write(final)
-                    cv2.imshow('final', final)
+                    result.write(img_w_car_det)
+                    cv2.imshow('final', img_w_car_det)
                 elif(save):
-                    result.write(final)
+                    result.write(img_w_car_det)
                 else:
-                    cv2.imshow('final', final)
+                    cv2.imshow('final', img_w_car_det)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -733,35 +802,40 @@ def Prcoess_video(filename, stacked = 0, resize_param = 0.5, save = 0, show = 1)
         result.release()
         print("The video was successfully saved")
     cv2.destroyAllWindows()
-    
 
-
-# --------------------------------------
-
-# ## Final Output
 
 # In[ ]:
 
-# Cell for taking arguments from terminal
+
 def play():
+
+    #sys.argv[0] is the python file name
+
     if( len(sys.argv) == 2 ):
         Prcoess_video(sys.argv[1])
 
     elif(len(sys.argv) == 3):
         Prcoess_video(sys.argv[1], int(sys.argv[2]))
 
+    elif(len(sys.argv) == 4):
+        Prcoess_video(sys.argv[1], int(sys.argv[2]), float(sys.argv[3]))
+
     else:
         Prcoess_video( sys.argv[1], int(sys.argv[2]), float(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]) )
 
 
-# In[ ]:
-play()
-
-
-# In[20]:
-
-
-#Prcoess_video(filename, stacked = 1, resize_param = 0.5, save = 0, show = 1)
-
-
 # --------------------------------------
+
+# ## Final Output
+
+# In[100]:
+
+
+counter = 0
+
+# resize parameter should be around (0.5 - 0.8) 
+# 0.8 for almost full screen
+
+#Prcoess_video('project_video_trimmed_cars.mp4', resize_param = 0.8, stacked = 1, save = 0, show = 1)
+
+play()
